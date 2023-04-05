@@ -62,8 +62,8 @@ public class Editor extends JFrame {
 	public 	static boolean WRITE_TO_OUTPUT = false;
 	private static final long serialVersionUID = 894467903207605180L;
 	private static final String APPLICATION_NAME = "PTexEdit";
-	private static final String VERSION_STRING = "0.3";
-	private static final String BUILD_DATE = "August 1, 2020";
+	private static final String VERSION_STRING = "0.4";
+	private static final String BUILD_DATE = "April 4, 2023";
 	private static final File settingsFile = new File(System.getProperty("user.home") + 
 						File.separatorChar+APPLICATION_NAME+File.separatorChar+APPLICATION_NAME+".properties");
 	private static Editor APPLICATION_WINDOW;
