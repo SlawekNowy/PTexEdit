@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 import com.github.memo33.jsquish.Squish;
 import com.github.memo33.jsquish.Squish.CompressionMethod;
@@ -268,6 +269,9 @@ public class PapaTexture extends PapaComponent{
 		if(textureConverter instanceof DXT)
 			((DXT) textureConverter).setCompressionMethod(settings.method);
 		generateTexture(input,textureConverter, settings, name);
+		if(Pattern.compile(settings.srgbTexname).matcher(name.toLowerCase()).find()) {
+			this.setSRGB(true);
+		}
 		
 	}
 	
@@ -281,15 +285,13 @@ public class PapaTexture extends PapaComponent{
 		int width = in.getWidth();
 		int height = in.getHeight();
 		int mipCount = 0;
-		boolean widthPOT = testPowerOfTwo(width);
-		boolean heightPOT = testPowerOfTwo(height);
-		if((! widthPOT || ! heightPOT) && settings.resize) {
+		if(settings.resize) {
 			/*if(!settings.resize)
 				throw new IOException("Texture dimensions are not powers of two.\n" 
 					+ (!widthPOT ? "Width = "+width+" (nearest powers are "+toPowerOfTwo(width, 2)+", "+toPowerOfTwo(width, 1)+")\n" :"")
 					+ (!heightPOT ? "Height = "+height+" (nearest powers are "+toPowerOfTwo(height, 2)+", "+toPowerOfTwo(height, 1)+")\n" :""));*/
-			width = widthPOT ? width : toPowerOfTwo(width, settings.resizeMode);
-			height = heightPOT ? height : toPowerOfTwo(height, settings.resizeMode);
+			width = resizeInputValue(width, settings.resizeMode);
+			height = resizeInputValue(height, settings.resizeMode);
 			in = scaleImage(input, width, height, getScaleRenderingHint(settings.resizeMethod));
 		}
 		
@@ -306,10 +308,12 @@ public class PapaTexture extends PapaComponent{
 		for(int i = 1;i<=mipCount;i++) {
 			int mipWidth = (int) Math.max(width / Math.pow(2, i), 1);
 			int mipHeight = (int) Math.max(height / Math.pow(2, i), 1);
-			images[i] = scaleImage(in, mipWidth, mipHeight, getScaleRenderingHint(settings.mipmapResizeMethod));
+			images[i] = scaleImage(images[i-1], mipWidth, mipHeight, getScaleRenderingHint(settings.mipmapResizeMethod));
 		}
 		
 		createTextureArrays(mipCount + 1);
+		
+		this.data = textureConverter.encode(images);
 		
 		this.name = name;
 		this.format = textureConverter.formatIndex();
@@ -319,17 +323,12 @@ public class PapaTexture extends PapaComponent{
 		this.width = (short) width;
 		this.height = (short) height;
 		
-		this.data = textureConverter.encode(images);
 		ByteBuffer buf = ByteBuffer.wrap(data);
 		buf.order(ByteOrder.LITTLE_ENDIAN);
 		decodeAll(new TextureInfo(mipCount, width, height),buf,textureConverter);
 	}
 	
-	private boolean testPowerOfTwo(int value) {
-		return value > 0 && ((value & (value-1)) == 0);
-	}
-	
-	private int toPowerOfTwo(int value, int roundMode) {
+	private int resizeInputValue(int value, int roundMode) {
 		double val = value;
 		int count = 0;
 		while(val>1) {
@@ -337,16 +336,16 @@ public class PapaTexture extends PapaComponent{
 			count++;
 		}
 		switch(roundMode) {
-		case TextureSettings.RESIZE_DOWN:
-			return (int) Math.pow(2, count - 1);
-		case TextureSettings.RESIZE_UP:
-			return (int) Math.pow(2, count);
-		case TextureSettings.RESIZE_NEAREST:
-			if(val >=0.75d)
+			case TextureSettings.RESIZE_DOWN:
+				return (int) Math.pow(2, count - 1);
+			case TextureSettings.RESIZE_UP:
 				return (int) Math.pow(2, count);
-			return (int) Math.pow(2, count - 1);
-		default:
-			throw new IllegalArgumentException("Invalid round mode");
+			case TextureSettings.RESIZE_NEAREST:
+				if(val >=0.75d)
+					return (int) Math.pow(2, count);
+				return (int) Math.pow(2, count - 1);
+			default:
+				return roundMode; // assumed the roundMode is the wanted size
 		}
 	}
 	
@@ -371,20 +370,20 @@ public class PapaTexture extends PapaComponent{
 	
 	private TextureConverter getInstance(String format) throws IOException {
 		switch(format) {
-			case "R8G8B8A8":
+			case TextureSettings.R8G8B8A8:
 				return new R8G8B8A8();
-			case "R8G8B8X8":
+			case TextureSettings.R8G8B8X8:
 				return new R8G8B8X8();
-			case "B8G8R8A8":
+			case TextureSettings.B8G8R8A8:
 				return new B8G8R8A8();
-			case "DXT1":          
+			case TextureSettings.DXT1:          
 				return new DXT1();           
-			case "DXT3":          
-				return new DXT3(); // unsupported by PA  
-			case "DXT5":          
+			case TextureSettings.DXT5:          
 				return new DXT5(); 
-			case "R8":
-				return new R8();    
+			case TextureSettings.R8:
+				return new R8();
+			case TextureSettings.DXT_AUTO:
+				return new DXTAuto();
 			default:
 				throw new IOException("Unsupported format: "+format);
 		}
@@ -407,8 +406,9 @@ public class PapaTexture extends PapaComponent{
 	private void checkData(TextureInfo info, ByteBuffer buf, TextureConverter converter) throws IOException {
 		int expectedSize = converter.calcSize(info.width, info.height, info.mips);
 		int actualSize = buf.limit();
-		if(actualSize != expectedSize)
+		if(actualSize != expectedSize) {
 			throw new IOException("Image data size of "+actualSize+" bytes does not match expected size of " + expectedSize+" bytes");
+		}
 	}
 	
 
@@ -739,9 +739,9 @@ public class PapaTexture extends PapaComponent{
 			int size = 0;
 
 			for(int i=0;i<mips + 1;i++) {
-				double mipScale = Math.pow(2, i);
-				int w = (int) Math.ceil((double)width / mipScale / 4d);
-				int h = (int) Math.ceil((double)height / mipScale / 4d);
+				int mipScale = (int) Math.pow(2, i);
+				int w = (int) Math.ceil(Math.max(width / mipScale, 1) / 4d);
+				int h = (int) Math.ceil(Math.max(height / mipScale, 1) / 4d);
 				size+= w*h*chunkByteSize;
 			}
 			
@@ -760,11 +760,8 @@ public class PapaTexture extends PapaComponent{
 		
 			int width = info.width;
 			int height = info.height;
-			
-			int widthAssign = Math.min(4, width);
-			int heightAssign = Math.min(4, height);
+
 			byte[] colourBuffer = new byte[4];
-			
 			
 			BufferedImage b = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 			
@@ -776,8 +773,8 @@ public class PapaTexture extends PapaComponent{
 					colours = decodeColourMap(colourBuffer);
 					// 4x4 segment
 					int bits = buf.getInt();
-					for(int yy=0;yy<heightAssign;yy++) {
-						for(int xx=0;xx<widthAssign;xx++) {
+					for(int yy=0;yy<4;yy++) {
+						for(int xx=0;xx<4;xx++) {
 							int colourIndex = (int) (bits & 0b11);
 							if(yy + y < height && xx + x < width)
 								b.setRGB(x+xx, y+yy, colours[colourIndex].getRGB());
@@ -830,9 +827,6 @@ public class PapaTexture extends PapaComponent{
 			byte[] alphaBuf = new byte[8];
 			byte[] colourBuf = new byte[4];
 			
-			int widthAssign = Math.min(4, width);
-			int heightAssign = Math.min(4, height);
-			
 			BufferedImage b = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 			
 			//128 bits per 4x4 segment
@@ -846,8 +840,8 @@ public class PapaTexture extends PapaComponent{
 					buf.get(colourBuf);
 					colours = decodeColourMap(colourBuf);
 					int bits = buf.getInt();
-					for(int yy=0;yy<heightAssign;yy++) {
-						for(int xx=0;xx<widthAssign;xx++) {
+					for(int yy=0;yy<4;yy++) {
+						for(int xx=0;xx<4;xx++) {
 							int colourIndex = (int) (bits & 0b11);
 							if(yy + y < height && xx + x < width)
 								b.setRGB(x+xx, y+yy, (colours[colourIndex].getRGB()&0b11111111_11111111_11111111) | alphaValues[yy*4+xx]<<24);
@@ -874,7 +868,6 @@ public class PapaTexture extends PapaComponent{
 			Color[] colours = new Color[4];
 			int colour0 = ((data[0]&0b11111111) | data[1]<<8) & 0b11111111_11111111;
 			int colour1 = ((data[2]&0b11111111) | data[3]<<8) & 0b11111111_11111111;
-			
 			colours[0] = new Color((((colour0>>>11 & 0b00011111)*8)<<16) | (((colour0>>>5) & 0b00111111)*4)<<8 | (((colour0) & 0b00011111)*8));
 			colours[1] = new Color((((colour1>>>11 & 0b00011111)*8)<<16) | (((colour1>>>5) & 0b00111111)*4)<<8 | (((colour1) & 0b00011111)*8));
 			colours[2] = new Color(	(float)(2 * colours[0].getRed() + 		colours[1].getRed()) / 765f, // 765 = 3*255
@@ -919,8 +912,6 @@ public class PapaTexture extends PapaComponent{
 			int width = info.width;
 			int height = info.height;
 			
-			int widthAssign = Math.min(4, width);
-			int heightAssign = Math.min(4, height);
 			byte[] alphaBuf = new byte[8];
 			byte[] colourBuf = new byte[4];
 			
@@ -938,8 +929,8 @@ public class PapaTexture extends PapaComponent{
 					colours = decodeColourMap(colourBuf);
 					
 					int bits = br.getInt();
-					for(int yy=0;yy<heightAssign;yy++) {
-						for(int xx=0;xx<widthAssign;xx++) {
+					for(int yy=0;yy<4;yy++) {
+						for(int xx=0;xx<4;xx++) {
 							int colourIndex = (int) (bits & 0b11);
 							if(yy + y < height && xx + x < width)
 								b.setRGB(x+xx, y+yy, (colours[colourIndex].getRGB() & 0b11111111_11111111_11111111) | (alphaValues[yy*4+xx]<<24));
@@ -993,6 +984,64 @@ public class PapaTexture extends PapaComponent{
 		@Override
 		public byte formatIndex() {
 			return 6;
+		}
+		
+	}
+	
+	private class DXTAuto extends DXT {
+		
+		private final DXT1 dxt1 = new DXT1();
+		private final DXT5 dxt5 = new DXT5();
+		private DXT currentConverter = dxt1;
+
+		@Override
+		public int[] decodeAlphaMap(byte[] bytes) {
+			return currentConverter.decodeAlphaMap(bytes);
+		}
+
+		@Override
+		public BufferedImage decode(ByteBuffer buf, TextureInfo info) {
+			return currentConverter.decode(buf, info);
+		}
+
+		@Override
+		public byte formatIndex() {
+			return currentConverter.formatIndex();
+		}
+		
+		private void setCurrentConverterFromImage(BufferedImage input) {
+			for( int x=0; x<input.getWidth(); x++ ) {
+				for( int y=0; y<input.getHeight(); y++ ) {
+					if((input.getRGB(x, y) >>> 24) < 255) {
+						currentConverter = dxt5;
+						return;
+					}
+					
+				}
+			}
+			// no pixels with alpha found
+			currentConverter = dxt1;
+		}
+		
+		public byte[] encode(BufferedImage[] input) {
+			setCurrentConverterFromImage(input[0]);
+			return super.encode(input);
+		}
+		
+		@Override
+		public int calcSize(int width, int height, int mips) {
+			return currentConverter.calcSize(width, height, mips);
+		}
+
+		@Override
+		protected void encodeImage(BufferedImage input, ByteBuffer writer) {
+			currentConverter.encodeImage(input, writer);
+			
+		}
+		
+		@Override
+		public boolean supportsAlpha() {
+			return currentConverter.supportsAlpha();
 		}
 		
 	}
@@ -1079,6 +1128,7 @@ public class PapaTexture extends PapaComponent{
 		public static final int LINK_TYPE_REFERENCE = 1;
 		public static final int LINK_TYPE_OVERWRITE = 2; //TODO: unsupported!
 		
+		public static final String DXT_AUTO = "DXT (Auto)";
 		public static final String DXT1 = "DXT1";
 		public static final String DXT5 = "DXT5";
 		public static final String R8G8B8A8 = "R8G8B8A8";
@@ -1097,6 +1147,7 @@ public class PapaTexture extends PapaComponent{
 		private boolean linkEnabled;
 		private PapaFile linkTarget;
 		private int linkMethod;
+		private String srgbTexname;
 		
 		public String getFormat() {
 			return format;
@@ -1175,14 +1226,22 @@ public class PapaTexture extends PapaComponent{
 			this.linkMethod = linkMethod;
 			return this;
 		}
+		public String getSRGBTexname() {
+			return srgbTexname;
+		}
+		public TextureSettings setSRGBTexname(String texname) {
+			this.srgbTexname=texname;
+			return this;
+		}
 		public static TextureSettings defaultSettings() {
-			return new TextureSettings("DXT5",CompressionMethod.CLUSTER_FIT,true, RESIZE_TYPE_BICUIBIC, true, RESIZE_TYPE_BICUIBIC,RESIZE_NEAREST, false,false,null,LINK_TYPE_EMBED);
+			return new TextureSettings(TextureSettings.DXT_AUTO,CompressionMethod.CLUSTER_FIT,true, RESIZE_TYPE_BICUIBIC, true, RESIZE_TYPE_BICUIBIC,RESIZE_NEAREST, 
+					false,false,null,LINK_TYPE_EMBED,"diffuse|skybox");
 		}
 		
 		public TextureSettings() {};
 		
 		public TextureSettings(	String format, CompressionMethod method, boolean generateMipmaps, int mipmapResizeMethod, boolean resize, int resizeMethod, int resizeMode, boolean SRGB,
-								boolean linkEnabled, PapaFile linkTarget, int linkMethod) {
+								boolean linkEnabled, PapaFile linkTarget, int linkMethod, String srgbTexname) {
 			this.format = format;
 			this.method = method;
 			this.generateMipmaps = generateMipmaps;
@@ -1194,10 +1253,12 @@ public class PapaTexture extends PapaComponent{
 			this.linkEnabled=linkEnabled;
 			this.linkTarget=linkTarget;
 			this.linkMethod=linkMethod;
+			this.srgbTexname=srgbTexname;
 		}
 		
 		public ImmutableTextureSettings immutable() {
-			return new ImmutableTextureSettings(format,method, generateMipmaps, mipmapResizeMethod, resize, mipmapResizeMethod, resizeMode, SRGB,linkEnabled,linkTarget,linkMethod);
+			return new ImmutableTextureSettings(format,method, generateMipmaps, mipmapResizeMethod, resize, resizeMethod, 
+					resizeMode, SRGB,linkEnabled,linkTarget,linkMethod,srgbTexname);
 		}
 	}
 	
@@ -1213,20 +1274,22 @@ public class PapaTexture extends PapaComponent{
 		public final boolean linkEnabled;
 		public final PapaFile linkTarget;
 		public final int linkMethod;
+		public final String srgbTexname;
 		
 		private ImmutableTextureSettings(	String format, CompressionMethod method,  boolean generateMipmaps, int mipmapResizeMethod, boolean resize, int resizeMethod, 
-											int resizeMode, boolean SRGB, boolean linkEnabled, PapaFile linkTarget, int linkMethod) {
+											int resizeMode, boolean SRGB, boolean linkEnabled, PapaFile linkTarget, int linkMethod, String srgbTexname) {
 			this.format = format;
 			this.method = method;
 			this.generateMipmaps = generateMipmaps;
 			this.mipmapResizeMethod = mipmapResizeMethod;
 			this.resize = resize;
 			this.resizeMethod = resizeMethod;
-			this.resizeMode=resizeMode;
+			this.resizeMode = resizeMode;
 			this.SRGB = SRGB;
 			this.linkEnabled=linkEnabled;
 			this.linkTarget=linkTarget;
 			this.linkMethod=linkMethod;
+			this.srgbTexname=srgbTexname;
 		}
 	}
 	

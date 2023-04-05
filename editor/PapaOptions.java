@@ -34,6 +34,8 @@ import javax.swing.*;
 public class PapaOptions extends JDialog  {
 
 	private static final long serialVersionUID = -6635278548154607017L;
+	private static final int MINIMUM_RESIZE_SIZE = 128;
+	private static final int MAXIMUM_RESIZE_SIZE = 2048;
 	private JPanel contentPane;
 	private JButton okButton;
 	private JCheckBox repromptCheckBox;
@@ -108,8 +110,9 @@ public class PapaOptions extends JDialog  {
 	}
 	
 	private void applySettings(TextureSettings settings) {
-		repromptCheckBox.setSelected(false);
+		repromptCheckBox.setSelected(true);
 		repromptCheckBox.setVisible(multiMode);
+		ignoreReprompt = true;
 	}
 	
 	private void commit() { // applies all of the current settings
@@ -118,6 +121,7 @@ public class PapaOptions extends JDialog  {
 		resizeSection.commit(settings);
 		mipmapSection.commit(settings);
 		linkSection.commit(settings);
+		settings.setSRGBTexname(this.settings.srgbTexname);
 		
 		internalSettings = settings;
 		this.settings = internalSettings.immutable();
@@ -140,6 +144,7 @@ public class PapaOptions extends JDialog  {
 		internalSettings.setResize(t.resize);
 		internalSettings.setResizeMethod(t.resizeMethod);
 		internalSettings.setResizeMode(t.resizeMode);
+		internalSettings.setSRGBTexname(t.srgbTexname);
 		settings = t;
 		
 		
@@ -283,7 +288,7 @@ public class PapaOptions extends JDialog  {
 		
 		private boolean checkIsDXT() {
 			String value = (String) formatSelector.getSelectedItem();
-			return value.equals("DXT1") || value.equals("DXT3") || value.equals("DXT5");
+			return value.equals(TextureSettings.DXT1) || value.equals(TextureSettings.DXT5) || value.equals(TextureSettings.DXT_AUTO);
 		}
 		
 		public GeneralSection(TextureSettings settings) {
@@ -294,7 +299,8 @@ public class PapaOptions extends JDialog  {
 			
 			final int leftOffset = 85;
 			
-			final String[] formats = new String[] {"DXT1","DXT5","R8G8B8A8","R8G8B8X8","B8G8R8A8","R8"}; // DXT3
+			final String[] formats = new String[] {TextureSettings.DXT_AUTO, TextureSettings.DXT1,TextureSettings.DXT5,
+					TextureSettings.R8G8B8A8,TextureSettings.R8G8B8X8,TextureSettings.B8G8R8A8,TextureSettings.R8}; // DXT3
 			
 			formatSelector = new JComboBox<String>();
 			for(String s : formats)
@@ -353,7 +359,8 @@ public class PapaOptions extends JDialog  {
 	private class ResizeSection extends JPanel {
 		private static final long serialVersionUID = -2889774212551032335L;
 		private JCheckBox doResize;
-		private JComboBox<String> resizeMethod, resizeMode;
+		private JComboBox<String> resizeMethod;
+		private JComboBox<Object> resizeMode;
 		private JLabel labelMethod, labelAlgorithm;
 		
 		public ResizeSection(TextureSettings settings) {
@@ -385,10 +392,13 @@ public class PapaOptions extends JDialog  {
 			final int leftOffset = 85;
 			
 			
-			resizeMode = new JComboBox<String>();
+			resizeMode = new JComboBox<Object>();
 			resizeMode.addItem("Nearest Power of 2");
 			resizeMode.addItem("Up to Power of 2");
 			resizeMode.addItem("Down to Power of 2");
+			for(int i = PapaOptions.MAXIMUM_RESIZE_SIZE;i>=PapaOptions.MINIMUM_RESIZE_SIZE;i>>>=1) {
+				resizeMode.addItem(new Integer(i));
+			}
 			layout.putConstraint(SpringLayout.NORTH, resizeMode, 5, SpringLayout.SOUTH, doResize);
 			layout.putConstraint(SpringLayout.WEST, resizeMode, leftOffset, SpringLayout.WEST, this);
 			layout.putConstraint(SpringLayout.SOUTH, resizeMode, 25, SpringLayout.SOUTH, doResize);
@@ -405,7 +415,7 @@ public class PapaOptions extends JDialog  {
 			layout.putConstraint(SpringLayout.EAST, resizeMethod, -10, SpringLayout.EAST, this);
 			add(resizeMethod);
 			
-			labelMethod = new JLabel("Method:");
+			labelMethod = new JLabel("Value:");
 			layout.putConstraint(SpringLayout.NORTH, labelMethod, 3, SpringLayout.NORTH, resizeMode);
 			layout.putConstraint(SpringLayout.WEST, labelMethod, 20, SpringLayout.WEST, this);
 			add(labelMethod);
@@ -419,7 +429,11 @@ public class PapaOptions extends JDialog  {
 		
 		private void applySettings(TextureSettings settings) {
 			doResize.setSelected(settings.getResize());
-			resizeMode.setSelectedIndex(settings.getResizeMode());
+			if(settings.getResizeMode()>=PapaOptions.MINIMUM_RESIZE_SIZE) {
+				resizeMode.setSelectedItem((Integer)settings.getResizeMode());
+			} else {
+				resizeMode.setSelectedIndex(settings.getResizeMode());
+			}
 			resizeMode.setEnabled(settings.getResize());
 			resizeMethod.setEnabled(settings.getResize());
 			resizeMethod.setSelectedIndex(settings.getResizeMethod());
@@ -430,7 +444,12 @@ public class PapaOptions extends JDialog  {
 		private void commit(TextureSettings settings) {
 			settings.setResize(doResize.isSelected());
 			settings.setResizeMethod(resizeMethod.getSelectedIndex());
-			settings.setResizeMode(resizeMode.getSelectedIndex());
+			if(resizeMode.getSelectedItem().getClass() == Integer.class) {
+				settings.setResizeMode((Integer)resizeMode.getSelectedItem());
+			} else {
+				settings.setResizeMode(resizeMode.getSelectedIndex());
+			}
+			
 		}
 	}
 	private class MipmapSection extends JPanel {
@@ -590,6 +609,7 @@ public class PapaOptions extends JDialog  {
 			settings.setLinkEnabled(linkEnabled.isSelected());
 			settings.setLinkTarget((PapaFile)linkTargets.getSelectedItem());
 			settings.setLinkMethod(linkMethods.getSelectedIndex());
+			linkEnabled.setSelected(false); // spaghetti fix for auto convert. this section is basically unused anyway
 		}
 	}
 	private WindowListener wl = new WindowListener() {

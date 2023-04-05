@@ -59,6 +59,11 @@ public class BatchConvert extends JDialog  {
 	private LogSection logSection;
 	private FileWorker currentTask;
 	
+	private String inputFolderPath = "";
+	private String outputFolderPath = "";
+	
+	private String defaultSignature = "";
+	
 	private boolean isWorking;
 	
 	
@@ -66,6 +71,8 @@ public class BatchConvert extends JDialog  {
 		super(owner);
 		
 		setIconImages(owner.getIconImages());
+		
+		this.defaultSignature=defaultSignature;
 		
 		papaOptions = o;
 		addWindowListener(wl);
@@ -158,9 +165,15 @@ public class BatchConvert extends JDialog  {
 		layout.putConstraint(SpringLayout.EAST, convertButton, 85, SpringLayout.EAST, optionsButton);
 		add(convertButton);
 		
+		optionsSection.input.setText(inputFolderPath);
+		optionsSection.output.setText(outputFolderPath);
 		optionsSection.validateSelection();
 		
 		this.getRootPane().setDefaultButton(closeButton);
+	}
+	
+	public void setDefualtSignature(String defaultSignature) {
+		this.defaultSignature = defaultSignature;
 	}
 	
 	private void setWorking(boolean working) {
@@ -200,6 +213,27 @@ public class BatchConvert extends JDialog  {
 	
 	public void setIgnoreHierarchy(boolean b) {
 		optionsSection.ignoreHierarchy.setSelected(b);
+	}
+	
+	public void setInputFolder(String folderPath) {
+		inputFolderPath = folderPath;
+		optionsSection.input.setText(inputFolderPath);
+		optionsSection.validateSelection();
+		
+	}
+	
+	public void setOutputFolder(String folderPath) {
+		outputFolderPath = folderPath;
+		optionsSection.output.setText(outputFolderPath);
+		optionsSection.validateSelection();
+	}
+	
+	public String getInputFolder() {
+		return inputFolderPath;
+	}
+	
+	public String getOutputFolder() {
+		return outputFolderPath;
 	}
 	
 	public void showAt(int x, int y) {
@@ -254,6 +288,7 @@ public class BatchConvert extends JDialog  {
 			progressSection.setStatus("Scannning File System");
 			ImportInfo info = new ImportInfo();
 			info.setTextureSettings(settings);
+			info.setSignature(defaultSignature);
 			info.setActivityListener(new ActivityListener() {
 				
 				@Override
@@ -653,6 +688,8 @@ public class BatchConvert extends JDialog  {
 				output.setBorder(BorderFactory.createLineBorder(Color.red));
 			boolean valid = inpitValid && outputValid;
 			convertButton.setEnabled(valid);
+			inputFolderPath = input.getText();
+			outputFolderPath = output.getText();
 			return valid;
 		}
 		

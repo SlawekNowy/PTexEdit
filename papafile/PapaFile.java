@@ -110,6 +110,7 @@ public class PapaFile extends PapaComponent{
 	private String 	fileName = "Unknown";
 	private String 	filePath = "Unknown";
 	private String	relativePath = "Unknown";
+	private String  fileSignature = "";
 	
 	private boolean isPapa;
 	private boolean buildSuccessful = false;
@@ -126,7 +127,7 @@ public class PapaFile extends PapaComponent{
 	static {
 		try {
 			DEFAULT.addTexture(ImageIO.read(PapaFile.class.getResource("/papafile/error.png")), 
-								new TextureSettings("R8G8B8A8",CompressionMethod.CLUSTER_FIT, false, 0, false, 0, 0, false,false,null,0).immutable());
+								new TextureSettings("R8G8B8A8",CompressionMethod.CLUSTER_FIT, false, 0, false, 0, 0, false,false,null,0,"diffuse").immutable());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -209,6 +210,17 @@ public class PapaFile extends PapaComponent{
 	
 	public void setLocationRelative(String newName) {
 		setFileLocation(new File((PA_ROOT_DIR==null ? "" : PA_ROOT_DIR) + newName));
+	}
+	
+	public void setSignature(String signature) {
+		if(signature.length() > 6) {
+			signature = signature.substring(0, 6);
+		}
+		this.fileSignature = signature;
+	}
+	
+	public String getSignature() {
+		return this.fileSignature;
 	}
 	
 	public String getFileName() {
@@ -477,7 +489,7 @@ public class PapaFile extends PapaComponent{
 	
 	public PapaString getString(int index) {  // it is unwise to use this method directly unless you know what you're doing. Strings are highly volatile.
 		if(index==-1)
-			return new PapaString("", 0, null);
+			return new PapaString("", null);
 		checkAccess(strings,index);
 		return strings.get(index);
 	}
@@ -770,10 +782,9 @@ public class PapaFile extends PapaComponent{
 		
 		numAnimations = in.getShort();
 		
-		// padding 3
-		in.getShort();
-		in.getShort();
-		in.getShort();
+		byte[] signatureBuffer = new byte[6];
+		in.get(signatureBuffer);
+		this.fileSignature = new String(signatureBuffer).replace("\u0000", "");
 		
 		offsetStringTable = 	in.getLong();
 		offsetTextureTable = 	in.getLong();
@@ -792,16 +803,12 @@ public class PapaFile extends PapaComponent{
 		in.position((int) offsetStringTable);
 		
 		int[] length = 	new int[numStrings];
-		int[] padding = new int[numStrings];
 		long[] offset = new long[numStrings];
 		
 		for(int i =0;i<numStrings;i++) {
 			length[i] = 	in.getInt();
-			padding[i] = 	in.getInt();
+			in.getInt();
 			offset[i] = 	in.getLong();
-			
-			if(padding[i] != 0)
-				throw new IOException("Padding is not zero.");
 		}
 		
 		for(int i=0;i<numStrings;i++) {
@@ -812,7 +819,7 @@ public class PapaFile extends PapaComponent{
 			
 			String s = new String(buf);
 			
-			strings.add(new PapaString(s, padding[i],this));
+			strings.add(new PapaString(s,this));
 		}
 	}
 	
@@ -1288,7 +1295,10 @@ public class PapaFile extends PapaComponent{
 		b.putShort((short)numModels);
 		
 		b.putShort((short)numAnimations);
-		b.put(new byte[6]);
+		b.put(this.fileSignature.getBytes());
+		for(int i = 0;i<6 - this.fileSignature.length(); i++) {
+			b.put((byte) 0); // pad
+		}
 	}
 	
 	private void buildComponent(ArrayList<? extends PapaComponent> comp, ByteBuffer b) {
@@ -1326,7 +1336,7 @@ public class PapaFile extends PapaComponent{
 				return i;
 			}
 		
-		strings.add(new PapaString(s,0,this));
+		strings.add(new PapaString(s,this));
 		numStrings++;
 		return strings.size() - 1;
 	}
@@ -1377,11 +1387,11 @@ public class PapaFile extends PapaComponent{
 				&&	(p.numTextures 		== 	numTextures)
 				&&	(p.numVBuffers 		== 	numVBuffers)
 				&&	(p.isLinked 		== 	isLinked)
-				&&	(p.filePath.equals(		filePath))
-				&&	(p.fileName.equals(		fileName))
-				&&	(p.strings.equals(		strings))
-				&&	(p.textures.equals(		textures))
-				&&	(p.linkedFiles.equals(	linkedFiles));
+				&&	Objects.equals(p.filePath, filePath)
+				&&	Objects.equals(p.fileName, fileName)
+				&&	Objects.equals(p.strings, strings)
+				&&	Objects.equals(p.textures, textures)
+				&&	Objects.equals(p.linkedFiles, linkedFiles);
 		
 	}
 	

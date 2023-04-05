@@ -27,14 +27,12 @@ import papafile.PapaFile.BuildNotification;
 public class PapaString extends PapaComponent{
 
 	private String value;
-	private int padding;  // I have no clue what this actually does
 	private PapaFile papaFile;
 	
 	private PapaString() {};
 	
-	public PapaString(String value, int padding, PapaFile p) {
+	public PapaString(String value, PapaFile p) {
 		this.value=value;
-		this.padding=padding;
 		this.papaFile=p;
 	}
 	
@@ -44,10 +42,6 @@ public class PapaString extends PapaComponent{
 	
 	public void setValue(String value) {
 		this.value = value;
-	}
-	
-	public int getPadding() {
-		return padding;
 	}
 
 	@Override
@@ -63,7 +57,7 @@ public class PapaString extends PapaComponent{
 		data.put(value.getBytes());
 		
 		header.putInt(value.length());
-		header.putInt(padding);
+		header.putInt(0);
 		
 	}
 
@@ -104,15 +98,13 @@ public class PapaString extends PapaComponent{
 			return true;
 		
 		PapaString s = (PapaString) obj;
-		return 		(s.padding 		== 	padding)
-				&&	(s.value.equals(	value));
+		return (s.value.equals(	value));
 	}
 	
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + padding;
 		result = prime * result + value.hashCode();
 		return result;
 	}
@@ -136,7 +128,6 @@ public class PapaString extends PapaComponent{
 	public PapaString duplicate() {
 		PapaString p = new PapaString();
 		p.value = this.value;
-		p.padding = this.padding;
 		return p;
 	}
 

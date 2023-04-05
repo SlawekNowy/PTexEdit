@@ -177,7 +177,7 @@ public class PapaSkeleton extends PapaComponent {
 
 	@Override
 	protected int headerSize() {
-		return 8;
+		return 16;
 	}
 
 	@Override

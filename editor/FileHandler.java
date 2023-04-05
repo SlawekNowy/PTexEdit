@@ -313,6 +313,7 @@ public class FileHandler {
 					} else {
 						p = new PapaFile();
 						p.setFileLocation(file);
+						p.setSignature(info.getSignature());
 					}
 					
 					try {
@@ -400,6 +401,7 @@ public class FileHandler {
 		private AtomicInteger rejectedFiles  = new AtomicInteger();
 		private ImmutableTextureSettings importSettings;
 		private ActivityListener activityListener = ImportInfo.defaultResultManager;
+		private String signature = "";
 		
 		private Vector<File> rejectedFileList = new Vector<File>();
 		private Vector<String> rejectedFileReasons = new Vector<String>();
@@ -408,6 +410,14 @@ public class FileHandler {
 			if(importSettings!=null)
 				throw new IllegalStateException("Cannot modify TextureImportSettings");
 			importSettings = t;
+		}
+		
+		public void setSignature(String signature) {
+			this.signature = signature;
+		}
+		
+		public String getSignature() {
+			return this.signature;
 		}
 		
 		public void onStartProcessFile(File file, String name) {
@@ -776,11 +786,11 @@ public class FileHandler {
 			imageFilters[i + 1] = new FileNameExtensionFilter(filters[i].toUpperCase()+" Files (*."+filters[i]+")", filters[i]);
 	}
 
-	public static void saveFileTo(PapaFile target, File selectedFile) throws IOException {
+	public static void saveFileTo(PapaFile target, File selectedFile, boolean force) throws IOException {
 		File file = enforceExtension(selectedFile, papaFilter);
 		
-		if(file.exists())
-			if(Editor.optionBox(file.getName() +" already exists.\nDo you want to replace it?", "Confirm Save As", new Object[] {"Yes","No"}, "No") != 0)
+		if(!force && file.exists())
+			if(Editor.optionBox(file.getName() +" already exists.\nDo you want to replace it?", "Confirm Save As", new Object[] {"Yes","No"}, "Yes") != 0)
 				return;
 		try {
 			writeFile(target,file);
@@ -791,7 +801,7 @@ public class FileHandler {
 		target.setFileLocation(file);
 	}
 
-	public static void exportImageTo(PapaTexture activeTexture, File selectedFile, FileNameExtensionFilter filter) throws IOException {
+	public static void exportImageTo(PapaTexture activeTexture, File selectedFile, FileNameExtensionFilter filter, boolean force) throws IOException {
 		File file = enforceExtension(selectedFile,filter);
 		
 		int index = selectedFile.getName().lastIndexOf(".") + 1;
@@ -803,7 +813,7 @@ public class FileHandler {
 			Editor.showError("Extension "+ext+" does not match any known extensions", "Export error", new Object[] {"Ok"}, "Ok");
 			return;
 		}
-		if(file.exists())
+		if(!force && file.exists())
 			if(Editor.showError(file.getName() +" already exists.\nDo you want to replace it?", "Confirm Export", new Object[] {"Yes","No"}, "No") != 0)
 				return;
 		exportImage(activeTexture,file);
