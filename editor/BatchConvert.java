@@ -541,7 +541,7 @@ public class BatchConvert extends JDialog  {
 				j.setDialogTitle("Select Output Directory");
 				if(j.showOpenDialog(OptionsSection.this)==JFileChooser.APPROVE_OPTION) {
 					try {
-						input.setText(j.getSelectedFile().getCanonicalPath());
+						output.setText(j.getSelectedFile().getCanonicalPath());
 						validateSelection();
 					} catch (IOException e1) {}
 				}
