@@ -4,10 +4,21 @@
 
 plugins {
     id 'editor.java-application-conventions'
+
+    id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
 dependencies {
     implementation project(':papafile')
+    // https://mvnrepository.com/artifact/io.github.memo33/jsquish
+    implementation 'io.github.memo33:jsquish:2.1.0'
+    implementation 'org.apache.commons:commons-lang3:3.13.0'
+}
+
+
+javafx {
+    version = "17.0.8"
+    modules = [ 'javafx.controls' ]
 }
 
 application {

@@ -23,7 +23,7 @@ import java.awt.Color;
 import java.awt.event.*;
 import java.io.File;
 
-import com.github.memo33.jsquish.Squish.CompressionMethod;
+import io.github.memo33.jsquish.Squish.CompressionMethod;
 
 import papafile.PapaFile;
 import papafile.PapaTexture.ImmutableTextureSettings;
@@ -397,7 +397,7 @@ public class PapaOptions extends JDialog  {
 			resizeMode.addItem("Up to Power of 2");
 			resizeMode.addItem("Down to Power of 2");
 			for(int i = PapaOptions.MAXIMUM_RESIZE_SIZE;i>=PapaOptions.MINIMUM_RESIZE_SIZE;i>>>=1) {
-				resizeMode.addItem(new Integer(i));
+				resizeMode.addItem(i);
 			}
 			layout.putConstraint(SpringLayout.NORTH, resizeMode, 5, SpringLayout.SOUTH, doResize);
 			layout.putConstraint(SpringLayout.WEST, resizeMode, leftOffset, SpringLayout.WEST, this);

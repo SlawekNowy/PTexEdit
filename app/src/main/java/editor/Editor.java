@@ -37,7 +37,9 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 
-import com.github.memo33.jsquish.Squish.CompressionMethod;
+import io.github.memo33.jsquish.Squish.CompressionMethod;
+
+import org.apache.commons.lang3.SystemUtils;
 
 import editor.FileHandler.*;
 import editor.FileHandler.ImportInfo.ActivityListener;
@@ -60,6 +62,7 @@ public class Editor extends JFrame {
 	public 	static boolean ALLOW_EMPTY_FILES = false;
 	public 	static boolean SUPPRESS_WARNINGS = false;
 	public 	static boolean WRITE_TO_OUTPUT = false;
+	@Serial
 	private static final long serialVersionUID = 894467903207605180L;
 	private static final String APPLICATION_NAME = "PTexEdit";
 	private static final String VERSION_STRING = "0.4";
@@ -136,7 +139,7 @@ public class Editor extends JFrame {
 						}
 						APPLICATION_WINDOW.readAll(null, files);
 					} catch (IOException e) {
-						showError("Failed to open file: "+e.toString(), "Error", new Object[] {"OK"}, "OK");
+						showError("Failed to open file: "+e, "Error", new Object[] {"OK"}, "OK");
 					}
 					
 					APPLICATION_WINDOW.endOperation();
@@ -170,45 +173,38 @@ public class Editor extends JFrame {
 				settingsFile.createNewFile();
 			} catch (IOException e) {}
 		}
-		
-		FileInputStream fis = null;
-		
-		try {
-			fis = new FileInputStream(settingsFile);
-			prop.load(fis);
-		} catch (IOException e) {
-			System.err.println("Could not load settings file.");
-		} finally {
-			try {
-				fis.close();
-			} catch (IOException e) {}
-		}
+
+        try (FileInputStream fis = new FileInputStream(settingsFile)) {
+            prop.load(fis);
+        } catch (IOException e) {
+            System.err.println("Could not load settings file.");
+        }
 		
 		Editor e = APPLICATION_WINDOW;
-		e.setLocation(Integer.valueOf(prop.getProperty("Application.Location.X", "100")), Integer.valueOf(prop.getProperty("Application.Location.Y", "100")));
-		e.setBounds(Integer.valueOf(prop.getProperty("Application.Location.X", "100")), Integer.valueOf(prop.getProperty("Application.Location.Y", "100")),
-					Integer.valueOf(prop.getProperty("Application.Size.Width", "1060")), Integer.valueOf(prop.getProperty("Application.Size.Height", "800")));
-		e.mainPanel.setDividerLocation(Integer.valueOf(prop.getProperty("Application.SplitPane.Location", "395")));
-		e.setExtendedState(Integer.valueOf(prop.getProperty("Application.State", ""+JFrame.NORMAL)));
+		e.setLocation(Integer.parseInt(prop.getProperty("Application.Location.X", "100")), Integer.parseInt(prop.getProperty("Application.Location.Y", "100")));
+		e.setBounds(Integer.parseInt(prop.getProperty("Application.Location.X", "100")), Integer.parseInt(prop.getProperty("Application.Location.Y", "100")),
+					Integer.parseInt(prop.getProperty("Application.Size.Width", "1060")), Integer.parseInt(prop.getProperty("Application.Size.Height", "800")));
+		e.mainPanel.setDividerLocation(Integer.parseInt(prop.getProperty("Application.SplitPane.Location", "395")));
+		e.setExtendedState(Integer.parseInt(prop.getProperty("Application.State", ""+JFrame.NORMAL)));
 		
-		e.menu.setSelectedRadioButton(Integer.valueOf(prop.getProperty("Application.Menu.View.Channels", "0")));
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.View.Luminance", "false")))
+		e.menu.setSelectedRadioButton(Integer.parseInt(prop.getProperty("Application.Menu.View.Channels", "0")));
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.View.Luminance", "false")))
 			e.menu.mViewLuminance.doClick(0); // The fastest click in the west.
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.View.Alpha", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.View.Alpha", "false")))
 			e.menu.mViewNoAlpha.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.View.Tile", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.View.Tile", "false")))
 			e.menu.mViewTile.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.View.DXT", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.View.DXT", "false")))
 			e.menu.mViewDXT.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.Options.ShowRoot", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.Options.ShowRoot", "false")))
 			e.menu.mOptionsShowRoot.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.Options.AllowEmpty", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.Options.AllowEmpty", "false")))
 			e.menu.mOptionsAllowEmpty.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.Options.SuppressWarnings", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.Options.SuppressWarnings", "false")))
 			e.menu.mOptionsAllowEmpty.doClick(0);
-		if(Boolean.valueOf(prop.getProperty("Application.Menu.Options.WriteToDefaultOutput", "false")))
+		if(Boolean.parseBoolean(prop.getProperty("Application.Menu.Options.WriteToDefaultOutput", "false")))
 			e.menu.mOptionsWriteToOutput.doClick(0);
-		e.associationState = Integer.valueOf(prop.getProperty("Application.Menu.Options.Associate", "0"));
+		e.associationState = Integer.parseInt(prop.getProperty("Application.Menu.Options.Associate", "0"));
 		//e.maxThreads = Integer.valueOf(prop.getProperty("Application.Config.MaxThreads", "4"));
 		
 		e.defaultSignature = prop.getProperty("Application.Menu.Options.DefaultSignature","");
@@ -218,30 +214,33 @@ public class Editor extends JFrame {
 		
 		t.setFormat(prop.getProperty("PapaOptions.Format", def.getFormat()));
 		t.setCompressionMethod(CompressionMethod.valueOf(prop.getProperty("PapaOptions.DxtMethod", ""+def.getCompressionMethod())));
-		t.setGenerateMipmaps(Boolean.valueOf(prop.getProperty("PapaOptions.GenMipmaps", ""+def.getGenerateMipmaps())));
-		t.setMipmapResizeMethod(Integer.valueOf(prop.getProperty("PapaOptions.MipmapResizeMethod", ""+def.getMipmapResizeMethod())));
-		t.setSRGB(Boolean.valueOf(prop.getProperty("PapaOptions.SRGB", ""+def.getSRGB())));
-		t.setResize(Boolean.valueOf(prop.getProperty("PapaOptions.Resize", ""+def.getResize())));
-		t.setResizeMethod(Integer.valueOf(prop.getProperty("PapaOptions.ResizeMethod", ""+def.getResizeMethod())));
-		t.setResizeMode(Integer.valueOf(prop.getProperty("PapaOptions.ResizeMode", ""+def.getResizeMode())));
+		t.setGenerateMipmaps(Boolean.parseBoolean(prop.getProperty("PapaOptions.GenMipmaps", ""+def.getGenerateMipmaps())));
+		t.setMipmapResizeMethod(Integer.parseInt(prop.getProperty("PapaOptions.MipmapResizeMethod", ""+def.getMipmapResizeMethod())));
+		t.setSRGB(Boolean.parseBoolean(prop.getProperty("PapaOptions.SRGB", ""+def.getSRGB())));
+		t.setResize(Boolean.parseBoolean(prop.getProperty("PapaOptions.Resize", ""+def.getResize())));
+		t.setResizeMethod(Integer.parseInt(prop.getProperty("PapaOptions.ResizeMethod", ""+def.getResizeMethod())));
+		t.setResizeMode(Integer.parseInt(prop.getProperty("PapaOptions.ResizeMode", ""+def.getResizeMode())));
 		t.setSRGBTexname(prop.getProperty("PapaOptions.SRGBTexname", def.getSRGBTexname()));
 		
 		PapaFile.setPADirectory(prop.getProperty("PapaFile.PADirectory",null)!=null ? new File(prop.getProperty("PapaFile.PADirectory")) : null);
 		e.papaOptions = new PapaOptions(e, t.immutable());
 		e.batchConvert = new BatchConvert(e, e.papaOptions);
 		
-		e.batchConvert.setRecursive(Boolean.valueOf(prop.getProperty("BatchConvert.Recursive", ""+true)));
-		e.batchConvert.setWriteLinkedFiles(Boolean.valueOf(prop.getProperty("BatchConvert.WriteLinked", ""+false)));
-		e.batchConvert.setOverwrite(Boolean.valueOf(prop.getProperty("BatchConvert.Overwrite", ""+false)));
-		e.batchConvert.setIgnoreHierarchy(Boolean.valueOf(prop.getProperty("BatchConvert.IgnoreHierarchy", ""+false)));
+		e.batchConvert.setRecursive(Boolean.parseBoolean(prop.getProperty("BatchConvert.Recursive", ""+true)));
+		e.batchConvert.setWriteLinkedFiles(Boolean.parseBoolean(prop.getProperty("BatchConvert.WriteLinked", ""+false)));
+		e.batchConvert.setOverwrite(Boolean.parseBoolean(prop.getProperty("BatchConvert.Overwrite", ""+false)));
+		e.batchConvert.setIgnoreHierarchy(Boolean.parseBoolean(prop.getProperty("BatchConvert.IgnoreHierarchy", ""+false)));
 		e.batchConvert.setInputFolder(prop.getProperty("BatchConvert.InputFolder", ""));
 		e.batchConvert.setOutputFolder(prop.getProperty("BatchConvert.OutputFolder", ""));
 		
 		// awful jank
-		String name1 = "Associate With PAPA";
-		String name2 = "Dissociate With PAPA";
-		String name = e.associationState == 1 ? name1 : name2;
-		e.menu.mOptionsRegisterPTexEdit.setText(name);
+		if(SystemUtils.IS_OS_WINDOWS){
+			String name1 = "Associate With PAPA";
+			String name2 = "Dissociate With PAPA";
+			String name = e.associationState == 1 ? name1 : name2;
+			e.menu.mOptionsRegisterPTexEdit.setText(name);
+		}
+
 	}
 	
 	private static void addShutdownHooks() {
@@ -466,7 +465,7 @@ public class Editor extends JFrame {
 		
 		@Override
 		protected void process(List<PapaFile> chunks) {
-			if(chunks.size()!=0) {
+			if(!chunks.isEmpty()) {
 				for(PapaFile p : chunks) {
 					if(defaultSettings == null) {
 						configSelector.addToTreeOrSelect(p,!optimize || optimizeCounter++%optimizeFactor==0 || optimizeCounter == totalSubFiles);
@@ -789,6 +788,7 @@ public class Editor extends JFrame {
 	
 	private class MenuBar extends JMenuBar {
 		
+		@Serial
 		private static final long serialVersionUID = 275294845979597235L;
 
 		private ButtonGroup mViewChannelItems;
@@ -964,7 +964,7 @@ public class Editor extends JFrame {
 			add(mFile);
 			
 			mFileOpen = new JMenuItem("Open");
-			mFileOpen.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_MASK));
+			mFileOpen.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK));
 			mFile.add(mFileOpen);
 			mFileOpen.setMnemonic('o');
 			
@@ -984,7 +984,7 @@ public class Editor extends JFrame {
 			mFile.add(separator_1);
 			
 			mFileSave = new JMenuItem("Save");
-			mFileSave.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_MASK));
+			mFileSave.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK));
 			mFile.add(mFileSave);
 			mFileSave.setMnemonic('s');
 			mFileSave.setEnabled(false);
@@ -993,7 +993,7 @@ public class Editor extends JFrame {
 			});
 			
 			mFileSaveAs = new JMenuItem("Save As...");
-			mFileSaveAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mFileSaveAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mFile.add(mFileSaveAs);
 			mFileSaveAs.setMnemonic('A');
 			mFileSaveAs.setEnabled(false);
@@ -1005,7 +1005,7 @@ public class Editor extends JFrame {
 			mFile.add(separator);
 			
 			mFileImport = new JMenuItem("Import");
-			mFileImport.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_MASK));
+			mFileImport.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_DOWN_MASK));
 			mFile.add(mFileImport);
 			mFileImport.setMnemonic('i');
 			mFileImport.addActionListener((ActionEvent e) -> { // this is identical to mFileOpen and just changes the accepted file types. Fight me.
@@ -1025,7 +1025,7 @@ public class Editor extends JFrame {
 			});
 			
 			mFileExport = new JMenuItem("Export");
-			mFileExport.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_MASK));
+			mFileExport.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK));
 			mFile.add(mFileExport);
 			mFileExport.setMnemonic('e');
 			mFileExport.setEnabled(false);
@@ -1066,7 +1066,7 @@ public class Editor extends JFrame {
 			mFile.add(separator_2);
 			
 			JMenuItem mFileExit = new JMenuItem("Exit");
-			mFileExit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_MASK));
+			mFileExit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK));
 			mFile.add(mFileExit);
 			mFileExit.setMnemonic('x');
 			
@@ -1080,7 +1080,7 @@ public class Editor extends JFrame {
 			
 			mEditCopy = new JMenuItem("Copy");
 			mEditCopy.setMnemonic('c');
-			mEditCopy.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mEditCopy.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mEditCopy.setEnabled(false);
 			mEdit.add(mEditCopy);
 			mEditCopy.addActionListener((ActionEvent e)-> {
@@ -1089,7 +1089,7 @@ public class Editor extends JFrame {
 			
 			mEditPaste = new JMenuItem("Paste");
 			mEditPaste.setMnemonic('p');
-			mEditPaste.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mEditPaste.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mEdit.add(mEditPaste);
 			mEditPaste.addActionListener((ActionEvent e)-> {
 				Image i = getImageFromClipboard();
@@ -1122,7 +1122,7 @@ public class Editor extends JFrame {
 			mViewChannelItems = new ButtonGroup();
 			
 			mViewChannelRGB = new JRadioButtonMenuItem("RGB",true);
-			mViewChannelRGB.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewChannelRGB.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewChannel.add(mViewChannelRGB);
 			mViewChannelItems.add(mViewChannelRGB);
 			mViewChannelRGB.addActionListener((ActionEvent e) -> {
@@ -1131,7 +1131,7 @@ public class Editor extends JFrame {
 			});
 			
 			mViewChannelR = new JRadioButtonMenuItem("R");
-			mViewChannelR.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewChannelR.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewChannel.add(mViewChannelR);
 			mViewChannelItems.add(mViewChannelR);
 			mViewChannelR.addActionListener((ActionEvent e) -> {
@@ -1141,7 +1141,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewChannelG = new JRadioButtonMenuItem("G");
-			mViewChannelG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewChannelG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_G, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewChannel.add(mViewChannelG);
 			mViewChannelItems.add(mViewChannelG);
 			mViewChannelG.addActionListener((ActionEvent e) -> {
@@ -1151,7 +1151,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewChannelB = new JRadioButtonMenuItem("B");
-			mViewChannelB.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_B, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewChannelB.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewChannel.add(mViewChannelB);
 			mViewChannelItems.add(mViewChannelB);
 			mViewChannelB.addActionListener((ActionEvent e) -> {
@@ -1161,7 +1161,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewChannelA = new JRadioButtonMenuItem("A");
-			mViewChannelA.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewChannelA.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewChannel.add(mViewChannelA);
 			mViewChannelItems.add(mViewChannelA);
 			mViewChannelA.addActionListener((ActionEvent e) -> {
@@ -1171,7 +1171,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewLuminance = new JCheckBoxMenuItem("Luminance");
-			mViewLuminance.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewLuminance.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewLuminance.setMnemonic('l');
 			mView.add(mViewLuminance);
 			mViewLuminance.addActionListener((ActionEvent e) -> {
@@ -1180,7 +1180,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewNoAlpha = new JCheckBoxMenuItem("Ignore Alpha");
-			mViewNoAlpha.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewNoAlpha.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewNoAlpha.setMnemonic('i');
 			mView.add(mViewNoAlpha);
 			mViewNoAlpha.addActionListener((ActionEvent e) -> {
@@ -1189,7 +1189,7 @@ public class Editor extends JFrame {
 			
 			
 			mViewTile = new JCheckBoxMenuItem("Tile");
-			mViewTile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewTile.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewTile.setMnemonic('t');
 			mView.add(mViewTile);
 			mViewTile.addActionListener((ActionEvent e) -> {
@@ -1199,7 +1199,7 @@ public class Editor extends JFrame {
 			mView.add(new JSeparator());
 			
 			mViewDXT = new JCheckBoxMenuItem("DXT Grid");
-			mViewDXT.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
+			mViewDXT.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 			mViewDXT.setMnemonic('d');
 			mView.add(mViewDXT);
 			mViewDXT.addActionListener((ActionEvent e) -> {
@@ -1284,65 +1284,69 @@ public class Editor extends JFrame {
 				APPLICATION_WINDOW.defaultSignature = signature;
 			});
 			mOptionsDefaultSignature.setMnemonic('s');
-			
-			if(associationState != 0) {
-				String name1 = "Associate With PAPA";
-				String name2 = "Dissociate With PAPA";
-				String name = associationState == 1 ? name1 : name2;
-				
-				mOptionsRegisterPTexEdit = new JMenuItem(name);
-				mOptions.add(mOptionsRegisterPTexEdit);
-				mOptionsRegisterPTexEdit.addActionListener((ActionEvent e) -> {
-					try {
-						File local = new File(Editor.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
-						File jre = new File(System.getProperty("java.home") + "/bin/javaw.exe");
-						if(!local.exists() || !local.isFile()) {
-							throw new IOException("Error locating PTexEdit");
-						}
-						if(!jre.exists() || !jre.isFile()) {
-							throw new IOException("Error locating JRE");
-						}
-						
-						String localPath = local.getCanonicalPath();
-						String jrePath =  jre.getCanonicalPath();
-						
-						if(!isAdmin()) {
-							int result = showError("PTexEdit must be run as administrator to perform this operation, would you like to relaunch as admin?"
-									+ "\nYou will need to run this command again after restarting!", 
-									mOptionsRegisterPTexEdit.getText(), new Object[] {"Yes","No"}, "Yes");
-							
-							if(result == 0) {
-								Runtime.getRuntime().exec("powershell Start-Process javaw.exe -Argument '-jar \\\""+localPath+"\\\"' -verb RunAs");
-								System.exit(0);
+
+
+			if (SystemUtils.IS_OS_WINDOWS) {
+				if(associationState != 0) {
+					String name1 = "Associate With PAPA";
+					String name2 = "Dissociate With PAPA";
+					String name = associationState == 1 ? name1 : name2;
+
+					mOptionsRegisterPTexEdit = new JMenuItem(name);
+					mOptions.add(mOptionsRegisterPTexEdit);
+					mOptionsRegisterPTexEdit.addActionListener((ActionEvent e) -> {
+						try {
+							File local = new File(Editor.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+							File jre = new File(System.getProperty("java.home") + "/bin/javaw.exe");
+							if(!local.exists() || !local.isFile()) {
+								throw new IOException("Error locating PTexEdit");
 							}
-							return;
+							if(!jre.exists() || !jre.isFile()) {
+								throw new IOException("Error locating JRE");
+							}
+
+							String localPath = local.getCanonicalPath();
+							String jrePath =  jre.getCanonicalPath();
+
+							if(!isAdmin()) {
+								int result = showError("PTexEdit must be run as administrator to perform this operation, would you like to relaunch as admin?"
+												+ "\nYou will need to run this command again after restarting!",
+										mOptionsRegisterPTexEdit.getText(), new Object[] {"Yes","No"}, "Yes");
+
+								if(result == 0) {
+									Runtime.getRuntime().exec("powershell Start-Process javaw.exe -Argument '-jar \\\""+localPath+"\\\"' -verb RunAs");
+									System.exit(0);
+								}
+								return;
+							}
+
+
+							String command1 = "cmd /c assoc .papa=PAPAFile";
+							String command2 = "cmd /c ftype PAPAFile="+jrePath +" -jar \""+localPath+"\" %1";
+							String res = "Successfully associated papa with PTexEdit";
+							if(associationState == 2) {
+								command1 = "cmd /c assoc .papa=";
+								command2 = "cmd /c ftype PAPAFile=";
+								res = "Successfully dissociated papa with PTexEdit";
+							}
+							Runtime.getRuntime().exec(command1);
+							Runtime.getRuntime().exec(command2);
+							optionBox(res, "Success", new Object[] {"OK"}, "OK");
+						} catch (URISyntaxException | IOException e1) {
+							showError("Error: "+e1, "Failed to associate", new Object[] {"OK"}, "OK");
 						}
-						
-						
-						String command1 = "cmd /c assoc .papa=PAPAFile";
-						String command2 = "cmd /c ftype PAPAFile="+jrePath +" -jar \""+localPath+"\" %1";
-						String res = "Successfully associated papa with PTexEdit";
-						if(associationState == 2) {
-							command1 = "cmd /c assoc .papa=";
-							command2 = "cmd /c ftype PAPAFile=";
-							res = "Successfully dissociated papa with PTexEdit";
+						if(associationState == 1) {
+							associationState = 2;
+						} else {
+							associationState = 1;
 						}
-						Runtime.getRuntime().exec(command1);
-						Runtime.getRuntime().exec(command2);
-						optionBox(res, "Success", new Object[] {"OK"}, "OK");
-					} catch (URISyntaxException | IOException e1) {
-						showError("Error: "+e1.toString(), "Failed to associate", new Object[] {"OK"}, "OK");
-					}
-					if(associationState == 1) {
-						associationState = 2;
-					} else {
-						associationState = 1;
-					}
-					mOptionsRegisterPTexEdit.setText(associationState == 1 ? name1 : name2);
-					
-				});
-				mOptionsRegisterPTexEdit.setMnemonic('o');
+						mOptionsRegisterPTexEdit.setText(associationState == 1 ? name1 : name2);
+
+					});
+					mOptionsRegisterPTexEdit.setMnemonic('o');
+				}
 			}
+
 			
 			
 			
@@ -1460,6 +1464,7 @@ public class Editor extends JFrame {
 	
 	private class RibbonPanel extends JPanel {
 		
+		@Serial
 		private static final long serialVersionUID = 8964510055023743821L;
 		
 		private final int SLIDER_TICKS = 12;
@@ -1781,6 +1786,7 @@ public class Editor extends JFrame {
 	}
 	
 	private class LimitTextFieldDocument extends PlainDocument {
+		@Serial
 		private static final long serialVersionUID = 5103888339135962097L;
 		private final int max;
 		
@@ -1805,6 +1811,7 @@ public class Editor extends JFrame {
 	
 	private class ConfigPanelTop extends JPanel {
 		
+		@Serial
 		private static final long serialVersionUID = 14053510615893605L;
 		private JTextField imageName, filePath, fileSignature;
 		
@@ -1948,7 +1955,7 @@ public class Editor extends JFrame {
 		private void setTextureCount(int newMax) {
 			if(newMax>1) {
 				spinnerImage.setEnabled(true);
-				spinnerImage.setModel(new SpinnerNumberModel(new Integer(0), new Integer(0), new Integer(newMax-1), new Integer(1)));
+				spinnerImage.setModel(new SpinnerNumberModel(0, 0, newMax-1, 1));
 			}
 			else
 				spinnerImage.setEnabled(false);
@@ -1964,7 +1971,7 @@ public class Editor extends JFrame {
 				spinnerMipmap.setEnabled(false);
 			else
 				spinnerMipmap.setEnabled(true);
-			spinnerMipmap.setModel(new SpinnerNumberModel(new Integer(0), new Integer(0), new Integer(mips), new Integer(1)));
+			spinnerMipmap.setModel(new SpinnerNumberModel(0, 0, mips, 1));
 		}
 		
 		public int getSelectedMipmapIndex() {
@@ -2024,7 +2031,7 @@ public class Editor extends JFrame {
 					if(activeTexture==null)
 						return;
 					String name = imageName.getText();
-					if(name.equals(""))
+					if(name.isEmpty())
 						name = "<no name>";
 					activeTexture.setName(name);
 					refreshActiveTexture();
@@ -2063,7 +2070,7 @@ public class Editor extends JFrame {
 					if(activeFile==null || ! filePath.isEnabled())
 						return;
 					String path = filePath.getText();
-					if(path.equals(""))
+					if(path.isEmpty())
 						path = "<no path>";
 					activeFile.setLocationRelative(path);
 					refreshActiveFileLinks();
@@ -2167,6 +2174,7 @@ public class Editor extends JFrame {
 	
 	private class ConfigPanelBottom extends JPanel {
 
+		@Serial
 		private static final long serialVersionUID = 1721448070098959177L;
 		
 		private JLabel versionValueLabel, fileSizeValueLabel, imagesValueLabel, widthValueLabel, heightValueLabel, formatValueLabel, mipmapsValueLabel;
@@ -2341,6 +2349,7 @@ public class Editor extends JFrame {
 	
 	private class ConfigPanelSelector extends JPanel {
 		
+		@Serial
 		private static final long serialVersionUID = 2925995949876826577L;
 		private final DefaultMutableTreeNode root;
 		private DefaultMutableTreeNode lastSelected;
@@ -2393,8 +2402,7 @@ public class Editor extends JFrame {
 			TreePath mainSelect = fileTree.getSelectionPath();
 			ArrayList<TreePath> selectedArray = new ArrayList<TreePath>();
 			if(selected!=null)
-				for(TreePath t : selected)
-					selectedArray.add(t);
+				selectedArray.addAll(Arrays.asList(selected));
 			if(mainSelect!=null) {
 				selectedArray.remove(mainSelect);
 				selectedArray.add(0,mainSelect);
@@ -2461,8 +2469,9 @@ public class Editor extends JFrame {
 		}
 		
 		private DefaultMutableTreeNode getSimilarChildFromObject(DefaultMutableTreeNode host, Object o) {
-			for(@SuppressWarnings("unchecked") Enumeration<DefaultMutableTreeNode> e = host.children();e.hasMoreElements();) {
-				DefaultMutableTreeNode child = e.nextElement();
+			for(@SuppressWarnings("unchecked") Enumeration<TreeNode> e = host.children(); e.hasMoreElements();) {
+
+				DefaultMutableTreeNode child = (DefaultMutableTreeNode) e.nextElement();
 				Object childComp = child.getUserObject();
 				if(o.getClass()==String.class ? o.equals(childComp) : o == childComp)
 					return child;
@@ -2516,9 +2525,9 @@ public class Editor extends JFrame {
 		private DefaultMutableTreeNode[] getTopLevelNodes() {
 			ArrayList<DefaultMutableTreeNode> nodes = new ArrayList<DefaultMutableTreeNode>();
 			@SuppressWarnings("unchecked")
-			Enumeration<DefaultMutableTreeNode> e = root.children();
+			Enumeration<TreeNode> e = root.children();
 			while(e.hasMoreElements())
-				nodes.add(e.nextElement());
+				nodes.add((DefaultMutableTreeNode) e.nextElement());
 			return nodes.toArray(new DefaultMutableTreeNode[nodes.size()]);
 		}
 
@@ -2563,9 +2572,9 @@ public class Editor extends JFrame {
 		private DefaultMutableTreeNode[] getChildren(DefaultMutableTreeNode node) {
 			ArrayList<DefaultMutableTreeNode> nodes = new ArrayList<DefaultMutableTreeNode>();
 			@SuppressWarnings("unchecked")
-			Enumeration<DefaultMutableTreeNode> e = node.children();
+			Enumeration<TreeNode> e = node.children();
 			while(e.hasMoreElements()) {
-				nodes.add(e.nextElement());
+				nodes.add((DefaultMutableTreeNode) e.nextElement());
 			}
 			return nodes.toArray(new DefaultMutableTreeNode[nodes.size()]);
 		}
@@ -2615,6 +2624,7 @@ public class Editor extends JFrame {
 		}
 		
 		private DefaultTreeCellRenderer papaTreeRenderer = new DefaultTreeCellRenderer() {
+			@Serial
 			private static final long serialVersionUID = -3988740979113661683L;
 			private final Font font = this.getFont().deriveFont(Font.PLAIN);
 			private final Font underline;
@@ -2715,9 +2725,9 @@ public class Editor extends JFrame {
 		
 		private DefaultMutableTreeNode getTopLevelNodeFromPapaFile(PapaFile p) {
 			@SuppressWarnings("unchecked")
-			Enumeration<DefaultMutableTreeNode> e = (Enumeration<DefaultMutableTreeNode>)root.children();
+			Enumeration<TreeNode> e =root.children();
 			while(e.hasMoreElements()) {
-				DefaultMutableTreeNode element = e.nextElement();
+				DefaultMutableTreeNode element = (DefaultMutableTreeNode) e.nextElement();
 				if(element.getUserObject() instanceof PapaTexture && ((PapaTexture)element.getUserObject()).getParent().equals(p)
 						|| element.getUserObject() instanceof PapaFile && ((PapaFile)element.getUserObject()).equals(p)) {
 					fileTree.setSelectionPath(new TreePath(element.getPath()));
@@ -2919,9 +2929,9 @@ public class Editor extends JFrame {
 	        	
 	        	DefaultMutableTreeNode toSelect = replaced;
 	        	@SuppressWarnings("unchecked")
-				Enumeration<DefaultMutableTreeNode> en = replaced.children();
+				Enumeration<TreeNode> en = replaced.children();
 	        	while(en.hasMoreElements()) {
-	        		DefaultMutableTreeNode n = en.nextElement();
+	        		DefaultMutableTreeNode n = (DefaultMutableTreeNode) en.nextElement();
 	        		if(n.getUserObject()==t)
 	        			toSelect = n;
 	        	}
@@ -2989,15 +2999,16 @@ public class Editor extends JFrame {
 		
 		public PapaFile[] getTargetablePapaFiles() {
 			@SuppressWarnings("unchecked")
-			Enumeration<DefaultMutableTreeNode> e =  root.children();
+			Enumeration<TreeNode> e =  root.children();
 			ArrayList<PapaFile> files = new ArrayList<PapaFile>();
 			while(e.hasMoreElements())
-				files.add(getAssociatedPapaFile(e.nextElement()));
+				files.add(getAssociatedPapaFile((DefaultMutableTreeNode) e.nextElement()));
 			return files.toArray(new PapaFile[files.size()]);
 		}
 		
 		// https://stackoverflow.com/questions/4588109/drag-and-drop-nodes-in-jtree
 		private class TreeTransferHandler extends TransferHandler {
+			@Serial
 			private static final long serialVersionUID = 1609783140208717380L;
 
 			private DataFlavor nodesFlavor;
@@ -3252,9 +3263,9 @@ public class Editor extends JFrame {
 	        private PapaTexture[] extract(PapaFile p, boolean rip) {
 	        	PapaTexture[] textures = getValidTextures(p);
 	        	HashSet<PapaTexture> uniqueTextures = new HashSet<PapaTexture>();
-	        	for(int i =0;i<textures.length;i++) {
-        			uniqueTextures.add(extract(textures[i],rip));
-	        	}
+                for (PapaTexture texture : textures) {
+                    uniqueTextures.add(extract(texture, rip));
+                }
 	        	return uniqueTextures.toArray(new PapaTexture[uniqueTextures.size()]);
 	        }
 	        
@@ -3338,6 +3349,8 @@ public class Editor extends JFrame {
 	}
 	
 	private class ImagePanel extends JPanel { //TODO: Sprite sheet support (enter number of columns, rows, and images. animate button
+
+		@Serial
 		private static final long serialVersionUID = 341369068060762310L;
 		
 		private boolean ignoreAlpha,luminance, tile, mouseInBounds, mouseHeld, showDXT;
@@ -3363,6 +3376,7 @@ public class Editor extends JFrame {
 		private void initializeTransferHandler() {
 			setTransferHandler(new TransferHandler() {
 
+				@Serial
 				private static final long serialVersionUID = 6432655799671782224L;
 
 				public boolean canImport(TransferHandler.TransferSupport support) {
