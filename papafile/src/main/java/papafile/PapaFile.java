@@ -29,7 +29,7 @@ import java.util.Map.Entry;
 
 import javax.imageio.ImageIO;
 
-import com.github.memo33.jsquish.Squish.CompressionMethod;
+import io.github.memo33.jsquish.Squish.CompressionMethod;
 
 import papafile.PapaModel.PapaMeshBinding;
 import papafile.PapaTexture.ImmutableTextureSettings;

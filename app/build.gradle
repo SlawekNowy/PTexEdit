@@ -7,11 +7,10 @@ plugins {
 }
 
 dependencies {
-    implementation 'org.apache.commons:commons-text'
-    implementation project(':utilities')
+    implementation project(':papafile')
 }
 
 application {
     // Define the main class for the application.
-    mainClass = 'editor.app.App'
+    mainClass = 'editor.Editor'
 }

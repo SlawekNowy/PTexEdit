@@ -30,9 +30,9 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
 
-import com.github.memo33.jsquish.Squish;
-import com.github.memo33.jsquish.Squish.CompressionMethod;
-import com.github.memo33.jsquish.Squish.CompressionType;
+import io.github.memo33.jsquish.Squish;
+import io.github.memo33.jsquish.Squish.CompressionMethod;
+import io.github.memo33.jsquish.Squish.CompressionType;
 
 import papafile.PapaFile.BuildNotification;
 

@@ -8,4 +8,4 @@
  */
 
 rootProject.name = 'PTexEdit'
-include('app', 'list', 'utilities')
+include('app', 'papafile')
